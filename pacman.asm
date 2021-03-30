@@ -7,15 +7,18 @@ REGXL	equ	$4
 REGXH	equ	$5
 REGYL	equ	$6
 REGYH	equ	$7
-REGK	equ	$10
-REGL	equ	$11
-REGM	equ	$12
-REGN	equ	$13
+
+REG_U1	equ	$10
+REG_U2	equ	$11
+REG_U3	equ	$12
+REG_U4	equ	$13
+REG_UU	equ	$20
 
 
 DSPON	equ	$04b1
 INKEY	equ	$0436
-#CLS	equ	$d90c
+CLS_V1	equ	$d90c
+CLS_V2	equ	$dba8
 
 VRAM00	equ	$7000
 VRAM01	equ	$7200
@@ -49,55 +52,58 @@ MON_P	equ	$6900
 org $6100
 
 begin:
+	lidp $fff0	# ROM Verチェック
+	ldd
+	cpia $03
+	jrzp V2
+	call CLS_V1
+	jp next8
+V2:
+	call CLS_V2
+next8:
 	cal DSPON
 
 	lia $9c
-	lip REGK
-	exam		# REGK 初期値
-	lia $e8
-	lip REGL
-	exam		# REGL 初期値
-	lip REGM
+	lip REG_U1
+	exam		# REG_U1 初期値
+	lia $dd
+	lip REG_U2
+	exam		# REG_U2 初期値
+	lip REG_U3
 	clra
-	exam		# REGM 0 初期値
-	lip REGN
+	lii 2-1
+	film		# REG_U3,REG_U4 0 初期値
+
+	lidp VV_S0	# VVRAMクリア
 	clra
-	exam		# REGN 0 初期値
-	lidp VV_S0
-	clra
-	lii $c0-1
-	fild		# VVRAMクリア
-	lidp VV_S1
-	fild		# VVRAMクリア
-	lidp VV_S2
-	fild		# VVRAMクリア
-	lidp VV_S3
-	fild		# VVRAMクリア
+	lii $ff
+	fild
+	lidp VV_S0+$100
+	fild
+	lidp VV_S0+$200
+	fild
 
 init:
 	call INKEY	# キーが何も押されていない
 	jrcm init
 
-	#call CLS
-
-	#jp second
 mainloop1:
 pacman:
-	lip REGK
+	lip REG_U1
 	cpim 0
 	jrzp monster
 	call pac_disp
-	lip REGK
+	lip REG_U1
 	sbim 2
 monster:
-	lip REGL
+	lip REG_U2
 	cpim 0
 	jrzp second
 	cpim $9c
 	jrncp next1
 	call mon_disp
 next1:
-	lip REGL
+	lip REG_U2
 	sbim 2
 	tsim $02
 	jrzp next
@@ -105,102 +111,97 @@ next1:
 next:
 	call vvtrans
 loop1:
-	#call wait
+	call wait
 	cal INKEY
 	jrncm mainloop1
 
 second:
 	clra
-	lip REGK
-	exam		# REGK 初期値
-	clra
-	lip REGL
-	exam		# REGL 初期値
-	lip REGM
-	clra
-	exam		# REGM 0 初期値
-	lip REGN
-	clra
-	exam		# REGN 0 初期値
+	lip REG_U1
+	lii 4-1
+	film		# REG_U1/REG_U2/REG_U3/REG_U4 0クリア
 
 mainloop2:
 
 monster2:
-	lip REGL
+	lip REG_U2
 	cpim $9c
 	jrzp bpacman
 	cpim $0a
 	jrcp next3
 	call mon_disp2
 next3:
-	lip REGL
+	lip REG_U2
 	adim 2
 
 bpacman:
-	lip REGL
-	cpim $42
+	lip REG_U2
+	cpim $40
 	jrcp next4
-	lip REGK
+	lip REG_U1
 	cpim $9c
-	jrcp next8
+	jrcp next7
 	jp next4
-next8:
+next7:
 	call bpac_disp
-	lip REGK
+	lip REG_U1
 	adim 2
 	tsim $02
-	jrzp next7
+	jrzp next4
 	adim 1
-next7:
 
 next4:
 	call vvtrans
 
+	call wait
 	cal INKEY
 	jrncm mainloop2
+	lij 1
 	rtn
 
 wait:
 	push
 	lia $ff
 wait0:
-	nopw
+	nopt
+	nopt
+	nopt
 	deca
 	cpia 0
 	jrnzm wait0
 	pop
 	rtn
 
-
 pac_disp:
-	lip REGYH
-	lia (MON_S-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_S-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
-	lip REGXH
-	lia (pacman00-1)>>8
-	exam
-	decp
+
+	lp REGXL
 	lia (pacman00-1)&$ff
 	exam
+	incp
+	lia (pacman00-1)>>8
+	exam
 
-	lip REGM
+	lip REG_U3
 	ldm
 	cpia $60
 	jrnzp next2
 	lia $20
 next2:
 	lib 0
-	lip REGXL
-	adb		# REGX <- REGX + REGM
+	lp REGXL
+	adb		# REGX <- REGX + REG_U3
 	
 	lii 16
 	call trans0
@@ -209,16 +210,16 @@ next2:
 	iys
 # pacman 上段の表示はここまで
 
-	lip REGYH
-	lia (MON_S+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S+$c0-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_S+$c0-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	lii 16
@@ -229,33 +230,33 @@ next2:
 
 # pacman 下段の表示はここまで
 
-	lip REGM
+	lip REG_U3
 	adim $20
-	anim $60	# REGM の更新
+	anim $60	# REG_U3 の更新
 
 	rtn
 
 bpac_disp:
-	lip REGYH
-	lia (MON_P-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_P-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_P-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
-	lip REGXH
-	lia (pacman10-1)>>8
-	exam
-	decp
+	lp REGXL
 	lia (pacman10-1)&$ff
 	exam
+	incp
+	lia (pacman10-1)>>8
+	exam
 
-	lip REGM
+	lip REG_U3
 	ldm
 	cpia $c0
 	jrnzp next5
@@ -267,8 +268,8 @@ next5:
 	jrncp next6
 	lib 1
 next6:
-	lip REGXL
-	adb		# REGX <- REGX + REGM
+	lp REGXL
+	adb		# REGX <- REGX + REG_U3
 
 	clra
 	iys
@@ -278,16 +279,16 @@ next6:
 	call trans0
 # bpacman 上段の表示はここまで
 
-	lip REGYH
-	lia (MON_P+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_P+$c0-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_P+$c0-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	clra
@@ -297,16 +298,16 @@ next6:
 	lii 32
 	call trans0
 
-	lip REGYH
-	lia (MON_P+$c0+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_P+$c0+$c0-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_P+$c0+$c0-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	clra
@@ -316,16 +317,16 @@ next6:
 	lii 32
 	call trans0
 
-	lip REGYH
-	lia (MON_P+$c0+$c0+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_P+$c0+$c0+$c0-1)&$ff
 	exam
-	lip REGK
+	incp
+	lia (MON_P+$c0+$c0+$c0-1)>>8
+	exam
+	lip REG_U1
 	ldm
-	lib 0		# REGK -> BA
-	lip REGYL
+	lib 0		# REG_U1 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	clra
@@ -336,37 +337,37 @@ next6:
 	call trans0
 
 # bpacman 下段の表示はここまで
-	lip REGM
+	lip REG_U3
 	adim $40
-	anim $c0	# REGM の更新
+	anim $c0	# REG_U3 の更新
 
 	rtn
 
 mon_disp:
-	lip REGYH
-	lia (MON_S-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S-1)&$ff
 	exam
-	lip REGL
+	incp
+	lia (MON_S-1)>>8
+	exam
+	lip REG_U2
 	ldm
-	lib 0		# REGL -> BA
-	lip REGYL
+	lib 0		# REG_U2 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
-	lip REGXH
-	lia (monster00-1)>>8
-	exam
-	decp
+	lp REGXL
 	lia (monster00-1)&$ff
 	exam
+	incp
+	lia (monster00-1)>>8
+	exam
 
-	lip REGN
+	lip REG_U4
 	ldm
 	lib 0
-	lip REGXL
-	adb		# REGX <- REGX + REGN
+	lp REGXL
+	adb		# REGX <- REGX + REG_U4
 	
 	lii 16
 	call trans0
@@ -376,16 +377,16 @@ mon_disp:
 	iys
 # Monster 上段の表示はここまで
 
-	lip REGYH
-	lia (MON_S+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S+$c0-1)&$ff
 	exam
-	lip REGL
+	incp
+	lia (MON_S+$c0-1)>>8
+	exam
+	lip REG_U2
 	ldm
-	lib 0		# REGL -> BA
-	lip REGYL
+	lib 0		# REG_U2 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	lii 16
@@ -397,37 +398,37 @@ mon_disp:
 
 # Monster 下段の表示はここまで
 
-	lip REGN
+	lip REG_U4
 	adim $20
-	anim $20	# REGN の更新
+	anim $20	# REG_U4 の更新
 
 	rtn
 	
 mon_disp2:
-	lip REGYH
-	lia (MON_S-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S-1)&$ff
 	exam
-	lip REGL
+	incp
+	lia (MON_S-1)>>8
+	exam
+	lip REG_U2
 	ldm
-	lib 0		# REGL -> BA
-	lip REGYL
+	lib 0		# REG_U2 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
-	lip REGXH
-	lia (monster10-1)>>8
-	exam
-	decp
+	lp REGXL
 	lia (monster10-1)&$ff
 	exam
+	incp
+	lia (monster10-1)>>8
+	exam
 
-	lip REGN
+	lip REG_U4
 	ldm
 	lib 0
-	lip REGXL
-	adb		# REGX <- REGX + REGN
+	lp REGXL
+	adb		# REGX <- REGX + REG_U4
 	
 	clra
 	iys
@@ -436,16 +437,16 @@ mon_disp2:
 	call trans0
 # Monster 上段の表示はここまで
 
-	lip REGYH
-	lia (MON_S+$c0-1)>>8
-	exam
-	decp
+	lp REGYL
 	lia (MON_S+$c0-1)&$ff
 	exam
-	lip REGL
+	incp
+	lia (MON_S+$c0-1)>>8
+	exam
+	lip REG_U2
 	ldm
-	lib 0		# REGL -> BA
-	lip REGYL
+	lib 0		# REG_U2 -> BA
+	lp REGYL
 	adb		# REGYL/YH + BA
 
 	clra
@@ -456,316 +457,157 @@ mon_disp2:
 
 # Monster 下段の表示はここまで
 
-	lip REGN
+	lip REG_U4
 	adim $20
-	anim $20	# REGN の更新
+	anim $20	# REG_U4 の更新
 
 	rtn
+
+
 vvtrans:
+	lii 30-1
+	lij 18-1
 # VRAM00
-	lip REGXL
-	lia (VV_S0+6*5-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S0+6*5-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM00+6*2-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM00+6*2-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S0+6*5
+	lip REG_UU
+	mvbd
+	lip REG_UU
+	lidp VRAM00+6*2
+	exbd
 # VRAM10
-	lip REGXL
-	lia (VV_S1+6*5-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S1+6*5-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM10+6*2-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM10+6*2-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S1+6*5
+	lip REG_UU
+	mvbd
+	lip REG_UU
+	lidp VRAM10+6*2
+	exbd
 # VRAM20
-	lip REGXL
-	lia (VV_S2+6*5-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S2+6*5-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM20+6*2-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM20+6*2-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S2+6*5
+	lip REG_UU
+	mvbd
+	lip REG_UU
+	lidp VRAM20+6*2
+	exbd
 # VRAM30
-	lip REGXL
-	lia (VV_S3+6*5-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S3+6*5-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM30+6*2-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM30+6*2-1)>>8
-	exam
-	lii 18
-	call trans0
-
+	lidp VV_S3+6*5
+	lip REG_UU
+	mvbd
+	lip REG_UU
+	lidp VRAM30+6*2
+	exbd
 # VRAM01
-	lip REGXL
-	lia (VV_S0+6*(3+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S0+6*(3+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM01-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM01-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S0+6*(3+5)
+	lip REG_UU
+	#lii 30-1
+	mvwd
+	lidp VRAM01
+	lip REG_UU
+	exwd
 # VRAM11
-	lip REGXL
-	lia (VV_S1+6*(3+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S1+6*(3+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM11-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM11-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S1+6*(3+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM11
+	lip REG_UU
+	exwd
 # VRAM21
-	lip REGXL
-	lia (VV_S2+6*(3+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S2+6*(3+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM21-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM21-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S2+6*(3+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM21
+	lip REG_UU
+	exwd
 # VRAM31
-	lip REGXL
-	lia (VV_S3+6*(3+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S3+6*(3+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM31-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM31-1)>>8
-	exam
-	lii 30
-	call trans0
-
+	lidp VV_S3+6*(3+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM31
+	lip REG_UU
+	exwd
 # VRAM02
-	lip REGXL
-	lia (VV_S0+6*(3+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S0+6*(3+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM02-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM02-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S0+6*(3+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM02
+	lip REG_UU
+	exwd
 # VRAM12
-	lip REGXL
-	lia (VV_S1+6*(3+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S1+6*(3+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM12-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM12-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S1+6*(3+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM12
+	lip REG_UU
+	exwd
 # VRAM22
-	lip REGXL
-	lia (VV_S2+6*(3+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S2+6*(3+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM22-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM22-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S2+6*(3+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM22
+	lip REG_UU
+	exwd
 # VRAM32
-	lip REGXL
-	lia (VV_S3+6*(3+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S3+6*(3+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM32-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM32-1)>>8
-	exam
-	lii 30
-	call trans0
-
+	lidp VV_S3+6*(3+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM32
+	lip REG_UU
+	exwd
 # VRAM03
-	lip REGXL
-	lia (VV_S0+6*(3+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S0+6*(3+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM03-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM03-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S0+6*(3+5+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM03
+	lip REG_UU
+	exwd
 # VRAM13
-	lip REGXL
-	lia (VV_S1+6*(3+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S1+6*(3+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM13-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM13-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S1+6*(3+5+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM13
+	lip REG_UU
+	exwd
 # VRAM23
-	lip REGXL
-	lia (VV_S2+6*(3+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S2+6*(3+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM23-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM23-1)>>8
-	exam
-	lii 30
-	call trans0
+	lidp VV_S2+6*(3+5+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM23
+	lip REG_UU
+	exwd
 # VRAM33
-	lip REGXL
-	lia (VV_S3+6*(3+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S3+6*(3+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM33-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM33-1)>>8
-	exam
-	lii 30
-	call trans0
-
+	lidp VV_S3+6*(3+5+5+5)
+	lip REG_UU
+	mvwd
+	lidp VRAM33
+	lip REG_UU
+	exwd
 # VRAM04
-	lip REGXL
-	lia (VV_S0+6*(3+5+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S0+6*(3+5+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM04-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM04-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S0+6*(3+5+5+5+5)
+	lip REG_UU
+	mvbd
+	lidp VRAM04
+	lip REG_UU
+	exbd
 # VRAM14
-	lip REGXL
-	lia (VV_S1+6*(3+5+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S1+6*(3+5+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM14-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM14-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S1+6*(3+5+5+5+5)
+	lip REG_UU
+	mvbd
+	lidp VRAM14
+	lip REG_UU
+	exbd
 # VRAM24
-	lip REGXL
-	lia (VV_S2+6*(3+5+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S2+6*(3+5+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM24-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM24-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S2+6*(3+5+5+5+5)
+	lip REG_UU
+	mvbd
+	lidp VRAM24
+	lip REG_UU
+	exbd
 # VRAM34
-	lip REGXL
-	lia (VV_S3+6*(3+5+5+5+5)-1)&$ff
-	exam
-	lip REGXH
-	lia (VV_S3+6*(3+5+5+5+5)-1)>>8
-	exam
-	lip REGYL
-	lia (VRAM34-1)&$ff
-	exam
-	lip REGYH
-	lia (VRAM34-1)>>8
-	exam
-	lii 18
-	call trans0
+	lidp VV_S3+6*(3+5+5+5+5)
+	lip REG_UU
+	mvbd
+	lidp VRAM34
+	lip REG_UU
+	exbd
 
 	rtn
 
@@ -830,30 +672,3 @@ pacman12:
 	db	$fe,$f8,$e0,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db	$00,$00,$00,$03,$07,$0f,$1f,$1f,$3f,$7f,$7f,$7f,$ff,$ff,$ff,$ff
 	db	$ff,$ff,$ff,$ff,$7e,$78,$60,$00,$00,$00,$00,$00,$00,$00,$00,$00
-#pacman10:
-#	db	$00,$00,$00,$c0,$e0,$f0,$f8,$f8,$fc,$fe,$fe,$fe,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$fe,$fe,$fe,$fc,$f8,$f8,$f0,$e0,$c0,$00,$00,$00
-#	db	$f0,$fe,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$fe,$f0
-#	db	$0f,$7f,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$7f,$0f
-#	db	$00,$00,$00,$03,$07,$0f,$1f,$1f,$3f,$7f,$7f,$7f,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$7f,$7f,$7f,$3f,$1f,$1f,$0f,$07,$03,$00,$00,$00
-#pacman11:
-#	db	$00,$00,$00,$c0,$e0,$f0,$f8,$f8,$fc,$fe,$fe,$fe,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$fe,$fe,$fe,$fc,$f8,$f8,$f0,$e0,$c0,$00,$00,$00
-#	db	$f0,$fe,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$7f,$7f,$3f,$3f,$3f,$1f,$1f,$1f,$0f,$0f,$07,$07,$03,$03,$00,$00
-#	db	$0f,$7f,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$fe,$fe,$fc,$fc,$fc,$f8,$f8,$f8,$f0,$f0,$e0,$e0,$c0,$c0,$00,$00
-#	db	$00,$00,$00,$03,$07,$0f,$1f,$1f,$3f,$7f,$7f,$7f,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$7f,$7f,$7f,$3f,$1f,$1f,$0f,$07,$03,$00,$00,$00
-#pacman12:
-#	db	$00,$00,$00,$c0,$e0,$f0,$f8,$f8,$fc,$fe,$fe,$fe,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$7e,$1e,$06,$00,$00,$00,$00,$00,$00,$00,$00,$00
-#	db	$f0,$fe,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$7f,$1f,$07,$01,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-#	db	$0f,$7f,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-#	db	$fe,$f8,$e0,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-#	db	$00,$00,$00,$03,$07,$0f,$1f,$1f,$3f,$7f,$7f,$7f,$ff,$ff,$ff,$ff
-#	db	$ff,$ff,$ff,$ff,$7e,$78,$60,$00,$00,$00,$00,$00,$00,$00,$00,$00
