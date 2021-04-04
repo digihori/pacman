@@ -7,6 +7,14 @@ REGXL	equ	$4
 REGXH	equ	$5
 REGYL	equ	$6
 REGYH	equ	$7
+REGK	equ	$8
+REGL	equ	$9
+REGM	equ	$a
+REGN	equ	$b
+REGIA	equ	$5c
+REGIB	equ	$5d
+REGFO	equ	$5e
+REGCTL	equ	$5f
 
 REG_U1	equ	$10
 REG_U2	equ	$11
@@ -57,18 +65,16 @@ begin:
 	cpia $03
 	jrzp V2
 	call CLS_V1
-	jp next8
+	jp L1
 V2:
 	call CLS_V2
-next8:
+L1:
 	cal DSPON
 
-	lia $9c
 	lip REG_U1
-	exam		# REG_U1 初期値
-	lia $dd
-	lip REG_U2
-	exam		# REG_U2 初期値
+	lia $9c
+	lii 2-1
+	film		# REG_U1,REG_U2 初期値
 	lip REG_U3
 	clra
 	lii 2-1
@@ -89,26 +95,24 @@ init:
 
 mainloop1:
 pacman:
+	call pac_disp
 	lip REG_U1
 	cpim 0
 	jrzp monster
-	call pac_disp
-	lip REG_U1
 	sbim 2
 monster:
-	lip REG_U2
-	cpim 0
-	jrzp second
-	cpim $9c
-	jrncp next1
 	call mon_disp
-next1:
+	lip REG_U1
+	cpim $6a
+	jrncp L2
 	lip REG_U2
+	cpim 3
+	jrcp second
 	sbim 2
 	tsim $02
-	jrzp next
+	jrzp L2
 	sbim 1
-next:
+L2:
 	call vvtrans
 loop1:
 	call wait
@@ -124,33 +128,26 @@ second:
 mainloop2:
 
 monster2:
+	call mon_disp2
 	lip REG_U2
 	cpim $9c
 	jrzp bpacman
-	cpim $0a
-	jrcp next3
-	call mon_disp2
-next3:
-	lip REG_U2
 	adim 2
 
 bpacman:
 	lip REG_U2
-	cpim $40
-	jrcp next4
-	lip REG_U1
-	cpim $9c
-	jrcp next7
-	jp next4
-next7:
+	cpim $42
+	jrcp L4
 	call bpac_disp
 	lip REG_U1
+	cpim $9c
+	jrncp L4
 	adim 2
 	tsim $02
-	jrzp next4
+	jrzp L4
 	adim 1
 
-next4:
+L4:
 	call vvtrans
 
 	call wait
@@ -163,7 +160,6 @@ wait:
 	push
 	lia $ff
 wait0:
-	nopt
 	nopt
 	nopt
 	deca
@@ -196,9 +192,9 @@ pac_disp:
 	lip REG_U3
 	ldm
 	cpia $60
-	jrnzp next2
+	jrnzp L5
 	lia $20
-next2:
+L5:
 	lib 0
 	lp REGXL
 	adb		# REGX <- REGX + REG_U3
@@ -259,15 +255,15 @@ bpac_disp:
 	lip REG_U3
 	ldm
 	cpia $c0
-	jrnzp next5
+	jrnzp L6
 	lia $40
-next5:
+L6:
 	lib 0
 	rc
 	sl
-	jrncp next6
+	jrncp L7
 	lib 1
-next6:
+L7:
 	lp REGXL
 	adb		# REGX <- REGX + REG_U3
 
